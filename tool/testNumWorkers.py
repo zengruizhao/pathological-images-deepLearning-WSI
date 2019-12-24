@@ -11,11 +11,11 @@ from src.data import Data
 
 if __name__ == '__main__':
     use_cuda = torch.cuda.is_available()
-    for num_workers in range(4, 32, 4):  # 遍历worker数
+    for num_workers in range(8, 16, 1):  # 遍历worker数
         kwargs = {'num_workers': num_workers, 'pin_memory': False} if use_cuda else {}
         train_set = Data(rootpth='/home/zzr/Data/Skin', mode='train')
         train_loader = DataLoader(train_set,
-                                  batch_size=128,
+                                  batch_size=192//5,
                                   drop_last=True,
                                   shuffle=True,
                                   **kwargs)
@@ -28,7 +28,7 @@ if __name__ == '__main__':
         #     batch_size=64, shuffle=True, **kwargs)
 
         start = time.time()
-        for epoch in range(1, 2):
+        for epoch in range(2):
             for batch_idx, (data, target) in enumerate(train_loader):  # 不断load
                 pass
 

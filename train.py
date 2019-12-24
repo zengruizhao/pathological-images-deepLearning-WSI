@@ -11,17 +11,20 @@ import datetime
 import argparse
 import os
 import os.path as osp
+import sys
+sys.path.append('../')
 from src.data import Data
 from src.logger import get_logger
 from src.model import SEResNext50
+import matplotlib.pyplot as plt
 
 
 def parse_args():
     parse = argparse.ArgumentParser()
-    parse.add_argument('--epoch', type=int, default=50)
-    parse.add_argument('--schedule_step', type=int, default=4)
+    parse.add_argument('--epoch', type=int, default=20)
+    parse.add_argument('--schedule_step', type=int, default=5)
 
-    parse.add_argument('--batch_size', type=int, default=128)
+    parse.add_argument('--batch_size', type=int, default=192//5)
     parse.add_argument('--test_batch_size', type=int, default=256)
     parse.add_argument('--num_workers', type=int, default=12)
 
@@ -29,11 +32,11 @@ def parse_args():
     parse.add_argument('--msg_fre', type=int, default=10)
     parse.add_argument('--save_fre', type=int, default=1)
 
-    parse.add_argument('--name', type=str, default='SEResNext50', help='log/model_out/tensorboard log')
+    parse.add_argument('--name', type=str, default='SEResNext50')
     parse.add_argument('--data_dir', type=str, default='/home/zzr/Data/Skin')
-    parse.add_argument('--log_dir', type=str, default='./logs')
-    parse.add_argument('--tensorboard_dir', type=str, default='./tensorboard')
-    parse.add_argument('--model_out_dir', type=str, default='./model_out')
+    parse.add_argument('--log_dir', type=str, default='../logs')
+    parse.add_argument('--tensorboard_dir', type=str, default='../tensorboard')
+    parse.add_argument('--model_out_dir', type=str, default='../model_out')
     parse.add_argument('--model_out_name', type=str, default='final_model.pth')
     parse.add_argument('--seed', type=int, default=5, help='random seed')
     parse.add_argument('--predefinedModel', type=str, default='./')
@@ -81,16 +84,15 @@ def main_worker(args, logger):
                                 num_workers=args.num_workers)
 
         net = SEResNext50().to(device)
-        x = torch.autograd.Variable(torch.rand(1, 3, 144, 144)).to(device)
-        writer.add_graph(net, x)
+        # x = torch.autograd.Variable(torch.rand(1, 3, 144, 144)).to(device)
+        # writer.add_graph(net, x)
         # net.load_state_dict(torch.load(args.predefinedModel))
-        # criterion = nn.BCELoss().cuda()
         criterion = nn.CrossEntropyLoss().cuda()
-        optimizer = optim.SGD(net.parameters(), lr=0.1, momentum=0.9)
+        optimizer = optim.SGD(net.parameters(), lr=.01, momentum=.9)
         # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',
         #                                                  factor=0.5,
         #                                                  patience=3)
-        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.schedule_step, gamma=0.3)
+        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.schedule_step, gamma=.1)
         loss_record = []
         iter = 0
         running_loss = []
@@ -98,9 +100,9 @@ def main_worker(args, logger):
         total_iter = len(train_loader) * args.epoch
         acc = 0
         for epoch in range(args.epoch):
-
             if epoch != 0 and epoch % args.eval_fre == 0:
                 acc = evalute(net, val_loader, epoch, logger)
+                writer.add_scalar('acc', acc, iter)
 
             if epoch != 0 and epoch % args.save_fre == 0:
                 model_out_name = osp.join(args.sub_model_out_dir, 'out_{}.pth'.format(epoch))
@@ -110,8 +112,16 @@ def main_worker(args, logger):
 
             for img, lb in train_loader:
                 iter += 1
-                img = img.cuda()
-                lb = lb.cuda()
+                bs, ncrops, c, h, w = img.size()
+                img = img.to(device).view(-1, c, h, w)
+                lb = lb.to(device).view(-1)
+                # for i in range(img.shape[0]):
+                #     print(lb[i])
+                #     imgshow = np.transpose(img[i, ...], (1, 2, 0))
+                #     plt.imshow(imgshow)
+                #     plt.show()
+
+                # img, lb = img.cuda(), lb.cuda()
                 optimizer.zero_grad()
                 outputs = net(img).view(img.shape[0], -1)
                 loss = criterion(outputs, lb)
@@ -161,8 +171,7 @@ def main_worker(args, logger):
                     writer.add_scalar('loss', avg_loss, iter)
                     writer.add_scalar('lr', lr, iter)
 
-            writer.add_scalar('acc', acc, iter)
-            scheduler.step(acc)
+            scheduler.step()
         # 训练完最后评估一次
         evalute(net, val_loader, args.epoch, logger)
 

@@ -4,6 +4,7 @@
 @Time    : 2019/12/10
 @Author  : Zengrui Zhao
 """
+import random
 import torch
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
@@ -14,6 +15,7 @@ from tqdm import tqdm
 import numpy as np
 import pickle
 from PIL import Image
+import PIL
 import matplotlib.pyplot as plt
 
 
@@ -41,22 +43,31 @@ class Data(Dataset):
         for root, dirs, names in os.walk(osp.join(rootpth, mode)):
             for name in names:
                 self.file_names.append(osp.join(root, name))
-
+        random.shuffle(self.file_names)
         # 确定分隔符号
         self.split_char = '\\' if '\\' in self.file_names[0] else '/'
 
         # totensor 转换n
         if mode == 'train':
-            self.to_tensor = transforms.Compose([transforms.RandomChoice([transforms.RandomHorizontalFlip(),
-                                                                          transforms.RandomVerticalFlip(),
-                                                                          transforms.RandomRotation(90)]),
-                                                 transforms.ToTensor(),
-                                                 transforms.Normalize((0.70624471, 0.70608306, 0.70595071),
-                                                                      (0.12062634, 0.1206659, 0.12071837))])
+            self.to_tensorImg = \
+                transforms.Compose([transforms.RandomHorizontalFlip(),
+                                    transforms.RandomVerticalFlip(),
+                                    transforms.RandomApply([transforms.RandomRotation(90)]),
+                                    transforms.RandomApply([transforms.ColorJitter(.1, .1, .1)]),
+                                    transforms.FiveCrop(128),
+                                    transforms.Lambda(lambda crops: torch.stack(
+                                        [transforms.ToTensor()(crop) for crop in crops])),
+                                    transforms.Lambda(lambda crops: torch.stack(
+                                        [transforms.Normalize((0.70624471, 0.70608306, 0.70595071),
+                                                              (0.12062634, 0.1206659, 0.12071837))(crop)
+                                         for crop in crops]))
+
+            ])
         else:
-            self.to_tensor = transforms.Compose([transforms.ToTensor(),
-                                                 transforms.Normalize((0.70624471, 0.70608306, 0.70595071),
-                                                                      (0.12062634, 0.1206659, 0.12071837))])
+            self.to_tensorImg = transforms.Compose([transforms.Resize(128),
+                                                    transforms.ToTensor(),
+                                                    transforms.Normalize((0.70624471, 0.70608306, 0.70595071),
+                                                                         (0.12062634, 0.1206659, 0.12071837))])
 
     def __getitem__(self, idx):
         self.name = self.file_names[idx]
@@ -65,12 +76,12 @@ class Data(Dataset):
         # a = np.array(img)
         # plt.imshow(img)
         # plt.show()
-        return self.to_tensor(img), torch.tensor(category)
+        return self.to_tensorImg(img), torch.tensor([category]*5) if self.mode == 'train' else torch.tensor(category)
 
     def __len__(self):
         return len(self.file_names)
 
-    def get_mean_std(self, type='train', mean_std_path='./mean.pkl'):
+    def get_mean_std(self, type='train', mean_std_path='../mean.pkl'):
         """
         计算数据集的均值和标准差
         :param type: 使用的是那个数据集的数据，有'train', 'test', 'testing'
@@ -99,13 +110,16 @@ class Data(Dataset):
 
 
 if __name__ == '__main__':
-    data = Data(mode='test')
-    for i in tqdm(range(len(data))):
-        a, b = data.__getitem__(i)
-        a = np.transpose(np.array(a), [2, 1, 0])
-        plt.imshow(a)
-        plt.show()
-        print(data.name)
-        print(b)
+    data = Data(mode='train')
+    # for i in tqdm(range(len(data))):
+    #     a, b = data.__getitem__(i)
+    #     print(a.shape, b.shape)
+    #     for j in range(5):
+    #         img = a[j, ...]
+    #         img = np.transpose(np.array(img), (1, 2, 0))
+    #         print(b[j])
+    #         plt.imshow(img)
+    #         plt.show()
+    #     break
 
-    # data.get_mean_std()
+    data.get_mean_std()
