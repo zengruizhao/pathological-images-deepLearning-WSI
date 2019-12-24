@@ -13,7 +13,9 @@ import cv2
 import numpy as np
 import argparse
 import warnings
-from src.model import SEResNext50
+import sys
+sys.path.append('../')
+from model import SEResNext50
 
 warnings.filterwarnings('ignore')
 

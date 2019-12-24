@@ -11,12 +11,9 @@ import datetime
 import argparse
 import os
 import os.path as osp
-import sys
-sys.path.append('../')
-from src.data import Data
-from src.logger import get_logger
-from src.model import SEResNext50
-import matplotlib.pyplot as plt
+from data import Data
+from logger import get_logger
+from model import SEResNext50
 
 
 def parse_args():

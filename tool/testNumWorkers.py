@@ -7,7 +7,7 @@ from torchvision import datasets, transforms
 import time
 from torch.utils.data import DataLoader
 sys.path.append('..')
-from src.data import Data
+from data import Data
 
 if __name__ == '__main__':
     use_cuda = torch.cuda.is_available()

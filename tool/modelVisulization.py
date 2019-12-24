@@ -6,7 +6,7 @@ from torchviz import make_dot
 from torchvision.models import AlexNet
 import sys
 sys.path.append('..')
-from src.model import SEResNext50
+from model import SEResNext50
 
 model = SEResNext50()
 

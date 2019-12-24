@@ -7,10 +7,10 @@
 import tqdm
 import time
 import os
-from src.readWSI import WSIPyramid
+from readWSI import WSIPyramid
 import numpy as np
 import torchvision.transforms as transforms
-from src.model import SEResNext50
+from model import SEResNext50
 import matplotlib.pyplot as plt
 import torch
 import argparse
