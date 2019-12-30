@@ -52,8 +52,8 @@ class Data(Dataset):
             self.to_tensorImg = \
                 transforms.Compose([transforms.RandomHorizontalFlip(),
                                     transforms.RandomVerticalFlip(),
-                                    transforms.RandomApply([transforms.RandomRotation(90)]),
-                                    transforms.RandomApply([transforms.ColorJitter(.1, .1, .1)]),
+                                    transforms.RandomApply([transforms.RandomRotation(90)], p=.3),
+                                    transforms.RandomApply([transforms.ColorJitter(.1, .1, .1)], p=.3),
                                     transforms.FiveCrop(128),
                                     transforms.Lambda(lambda crops: torch.stack(
                                         [transforms.ToTensor()(crop) for crop in crops])),

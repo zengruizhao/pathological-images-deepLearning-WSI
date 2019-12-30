@@ -13,13 +13,15 @@ import os
 import os.path as osp
 from data import Data
 from logger import get_logger
-from model import SEResNext50
+from model import SEResNext50, Vgg
+from torchvision.models import vgg19_bn
+from ranger import Ranger
 
 
 def parse_args():
     parse = argparse.ArgumentParser()
-    parse.add_argument('--epoch', type=int, default=20)
-    parse.add_argument('--schedule_step', type=int, default=5)
+    parse.add_argument('--epoch', type=int, default=50)
+    parse.add_argument('--schedule_step', type=int, default=3)
 
     parse.add_argument('--batch_size', type=int, default=192//5)
     parse.add_argument('--test_batch_size', type=int, default=256)
@@ -29,7 +31,7 @@ def parse_args():
     parse.add_argument('--msg_fre', type=int, default=10)
     parse.add_argument('--save_fre', type=int, default=1)
 
-    parse.add_argument('--name', type=str, default='SEResNext50')
+    parse.add_argument('--name', type=str, default='VGG')
     parse.add_argument('--data_dir', type=str, default='/home/zzr/Data/Skin')
     parse.add_argument('--log_dir', type=str, default='../logs')
     parse.add_argument('--tensorboard_dir', type=str, default='../tensorboard')
@@ -38,6 +40,16 @@ def parse_args():
     parse.add_argument('--seed', type=int, default=5, help='random seed')
     parse.add_argument('--predefinedModel', type=str, default='./')
     return parse.parse_args()
+
+
+def pretrained(net, pretrainedModel):
+    netDict = net.state_dict()
+    pretrainedModelDict = pretrainedModel.state_dict()
+    SameDict = {k: v for k, v in pretrainedModelDict.items() if k in netDict and v.shape == netDict[k].shape}
+    netDict.update(SameDict)
+    net.load_state_dict(netDict)
+
+    return net
 
 
 def evalute(net, val_loader, epoch, logger):
@@ -55,7 +67,6 @@ def evalute(net, val_loader, epoch, logger):
 
     acc = correct * 1. / total
     logger.info('accuracy:{:.4f} / epoch{}'.format(acc, epoch))
-    # writer.add_scalar('acc', acc, epoch)
     net.train()
 
     return acc
@@ -80,22 +91,24 @@ def main_worker(args, logger):
                                 pin_memory=False,
                                 num_workers=args.num_workers)
 
-        net = SEResNext50().to(device)
+        net = Vgg().to(device)
+        net = pretrained(net, vgg19_bn(pretrained=True))
         # x = torch.autograd.Variable(torch.rand(1, 3, 144, 144)).to(device)
         # writer.add_graph(net, x)
         # net.load_state_dict(torch.load(args.predefinedModel))
         criterion = nn.CrossEntropyLoss().cuda()
-        optimizer = optim.SGD(net.parameters(), lr=.01, momentum=.9)
+        # optimizer = Ranger(net.parameters(), lr=.001)
+        # optimizer = optim.SGD(net.parameters(), lr=.1, momentum=.9)
+        optimizer = Ranger(net.parameters(), lr=.01)
         # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',
         #                                                  factor=0.5,
         #                                                  patience=3)
-        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.schedule_step, gamma=.1)
+        # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.schedule_step, gamma=.3)
         loss_record = []
         iter = 0
         running_loss = []
         st = glob_st = time.time()
         total_iter = len(train_loader) * args.epoch
-        acc = 0
         for epoch in range(args.epoch):
             if epoch != 0 and epoch % args.eval_fre == 0:
                 acc = evalute(net, val_loader, epoch, logger)
@@ -168,7 +181,7 @@ def main_worker(args, logger):
                     writer.add_scalar('loss', avg_loss, iter)
                     writer.add_scalar('lr', lr, iter)
 
-            scheduler.step()
+            # scheduler.step()
         # 训练完最后评估一次
         evalute(net, val_loader, args.epoch, logger)
 

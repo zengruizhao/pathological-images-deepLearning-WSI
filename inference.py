@@ -10,17 +10,20 @@ import os
 from readWSI import WSIPyramid
 import numpy as np
 import torchvision.transforms as transforms
-from model import SEResNext50
+from model import SEResNext50, Vgg
 import matplotlib.pyplot as plt
 import torch
 import argparse
 from PIL import Image
 import torch.nn.functional as F
-
+"""
+img_size = (opt_size + 1) * downsampling + trainImageSize
+stride = img_size - trainImageSize + downsampling
+"""
 using_level = 1  # 20x
-img_size = 5264
-trainImageSize = 144
-downsampling = 32
+img_size = 4128
+trainImageSize = 128
+downsampling = 16
 stride = img_size - trainImageSize + downsampling
 # stride = int(img_size / 2)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -30,8 +33,9 @@ def parse_args():
     parse = argparse.ArgumentParser()
     parse.add_argument('--dataPth', type=str, default='/home/zzr/Data/wsi')
     parse.add_argument('--model', type=str,
-                       default='/home/zzr/Project/skinAreaSegmentation/model_out/191212-192559_SEResNext50/out_10.pth')
+                       default='/home/zzr/Project/skinAreaSegmentation/model_out/191227-205536_VGG/out_43.pth')
     parse.add_argument('--savePth', type=str, default='./')
+    parse.add_argument('--resultType', type=str, default='softmax')
 
     return parse.parse_args()
 
@@ -79,9 +83,9 @@ def inference(wsi, model):
                     img = Image.fromarray(img)
                     img = transform()(img).unsqueeze(0).to(device)
                     output = F.softmax(model(img), dim=1).cpu().detach().numpy().squeeze()
+                    # output = np.argmax(output, axis=0)
                     # output = model(img).cpu().detach().numpy().squeeze()
-                    # output = output[0, ...].squeeze()
-                    output = np.argmax(output, axis=0)
+                    output = output[0, ...].squeeze()
                     if output.shape[0] != tempOutputShape:
                         row = jdx * tempOutputShape + output.shape[0]
                     if output.shape[1] != tempOutputShape:
@@ -95,7 +99,7 @@ def inference(wsi, model):
 
 def main(args):
     # device = torch.device('cpu')
-    model = SEResNext50().to(device)
+    model = Vgg().to(device)
     model.load_state_dict(torch.load(args.model))
     WSI = [i for i in os.listdir(args.dataPth) if i.endswith('ndpi')]
     WSI = ['2018-06-06 15.12.38.ndpi']
@@ -103,7 +107,10 @@ def main(args):
         wsi = WSIPyramid(os.path.join(args.dataPth, i))
         result = inference(wsi, model)
         # np.save(os.path.join(args.savePth, 'result.npy'), result)
-        plt.imshow(result, cmap=plt.get_cmap('jet'))
+        # if not os.path.exists(f'../result/{i}'):
+        #     os.makedirs(f'../result/{i}')
+        # plt.imsave(f'../result/{i}/5.png', result, cmap='jet')
+        plt.imshow(result, cmap='jet')
         plt.show()
         # print(result)
 
